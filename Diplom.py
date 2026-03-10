@@ -1,4 +1,6 @@
 import re
+import math
+import cmath
 
 def find_first_integer(line):
     """Возвращает первое целое число из строки или None."""
@@ -18,6 +20,39 @@ class SpectraRow:
 
     def __repr__(self):
         return f"SpectraRow(λ={self.lam}, n={self.n}, T={self.T}, R={self.R})"
+    
+def compute_RT(n_film, k_film, lam, d_nm, n_sub):
+    """
+    Расчёт коэффициентов отражения R и пропускания T для тонкой плёнки
+    с комплексным показателем N = n_film + i*k_film, толщиной d_nm (нм),
+    на подложке с вещественным показателем n_sub. Нормальное падение из воздуха.
+    lam - длина волны в нм.
+    Возвращает (R_theor, T_theor).
+    """
+    N = complex(n_film, k_film)
+    k0 = 2.0 * math.pi / lam               # волновое число в вакууме, нм⁻¹
+    beta = k0 * N * d_nm                    # комплексная фазовая толщина
+
+    # Коэффициенты Френеля на границе воздух-плёнка
+    r01 = (1.0 - N) / (1.0 + N)
+    t01 = 2.0 / (1.0 + N)
+
+    # Коэффициенты Френеля на границе плёнка-подложка
+    r1s = (N - n_sub) / (N + n_sub)
+    t1s = 2.0 * N / (N + n_sub)
+
+    # Экспонента e^{-2iβ}
+    exp_beta = cmath.exp(-2j * beta)
+
+    # Амплитудные коэффициенты отражения и пропускания всей структуры
+    r = (r01 + r1s * exp_beta) / (1.0 + r01 * r1s * exp_beta)
+    t = (t01 * t1s * cmath.exp(-1j * beta)) / (1.0 + r01 * r1s * exp_beta)
+
+    # Энергетические коэффициенты
+    R_theor = abs(r) ** 2
+    T_theor = (n_sub / 1.0) * abs(t) ** 2   # свет выходит в подложку
+    return R_theor, T_theor
+
 
 data = []
 
@@ -71,3 +106,55 @@ except FileNotFoundError:
 print(f"\nУспешно прочитано {len(data)} записей.")
 for i, row in enumerate(data[:5]):
     print(f"{i+1}: {row}")
+
+
+
+n_min, n_max = 1.0, 6.0
+k_min, k_max = 0.0001, 3.0
+n_steps = 100
+k_steps = 300
+d_nm = 100.0         
+
+# Список для хранения лучших результатов по каждой точке
+best_per_point = []   # каждый элемент: (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, T_theor, R_theor)
+
+print("\nВыполняется перебор для всех точек...")
+for idx, row in enumerate(data):
+    lam = row.lam
+    n_sub = row.n
+    T_exp = row.T
+    R_exp = row.R
+
+    best_n = best_k = None
+    best_F = float('inf')
+    best_T = best_R = None
+
+    for i in range(n_steps):
+        n = n_min + (n_max - n_min) * i / (n_steps - 1)
+        for j in range(k_steps):
+            k = k_min + (k_max - k_min) * j / (k_steps - 1)
+            R_theor, T_theor = compute_RT(n, k, lam, d_nm, n_sub)
+            F = abs(R_theor - R_exp) + abs(T_theor - T_exp)
+            if F < best_F:
+                best_F = F
+                best_n = n
+                best_k = k
+                best_R = R_theor
+                best_T = T_theor
+
+    best_per_point.append((lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R))
+
+    if (idx+1) % 10 == 0 or idx == 0 or idx == len(data)-1:
+        print(f"Обработано {idx+1}/{len(data)} точек. Текущая λ = {lam}")
+
+# ---------- Поиск точки с глобальным минимумом невязки ----------
+best_global = min(best_per_point, key=lambda x: x[4])  # x[4] — это best_F
+
+print("\n" + "="*60)
+print("ОПОРНАЯ ТОЧКА С МИНИМАЛЬНОЙ НЕВЯЗКОЙ:")
+print(f"Длина волны λ = {best_global[0]:.2f} нм")
+print(f"Показатель преломления подложки n_sub = {best_global[1]:.4f}")
+print(f"Оптимальные параметры плёнки: n_film = {best_global[2]:.5f}, k_film = {best_global[3]:.6f}")
+print(f"Невязка F = {best_global[4]:.6f}")
+print(f"Экспериментальные: T_exp = {best_global[5]:.6f}, R_exp = {best_global[6]:.6f}")
+print(f"Теоретические:   T_theor = {best_global[7]:.6f}, R_theor = {best_global[8]:.6f}")

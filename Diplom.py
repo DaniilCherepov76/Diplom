@@ -19,7 +19,7 @@ class SpectraRow:
         self.R = R
 
     def __repr__(self):
-        return f"SpectraRow(λ={self.lam}, n={self.n}, T={self.T}, R={self.R})"
+        return f"λ={self.lam} -> n={self.n}, T={self.T}, R={self.R}"
     
 def compute_RT(n_film, k_film, lam, d_nm, n_sub):
     """
@@ -29,33 +29,12 @@ def compute_RT(n_film, k_film, lam, d_nm, n_sub):
     lam - длина волны в нм.
     Возвращает (R_theor, T_theor).
     """
-    N = complex(n_film, k_film)
-    k0 = 2.0 * math.pi / lam               # волновое число в вакууме, нм⁻¹
-    beta = k0 * N * d_nm                    # комплексная фазовая толщина
 
-    # Коэффициенты Френеля на границе воздух-плёнка
-    r01 = (1.0 - N) / (1.0 + N)
-    t01 = 2.0 / (1.0 + N)
-
-    # Коэффициенты Френеля на границе плёнка-подложка
-    r1s = (N - n_sub) / (N + n_sub)
-    t1s = 2.0 * N / (N + n_sub)
-
-    # Экспонента e^{-2iβ}
-    exp_beta = cmath.exp(-2j * beta)
-
-    # Амплитудные коэффициенты отражения и пропускания всей структуры
-    r = (r01 + r1s * exp_beta) / (1.0 + r01 * r1s * exp_beta)
-    t = (t01 * t1s * cmath.exp(-1j * beta)) / (1.0 + r01 * r1s * exp_beta)
-
-    # Энергетические коэффициенты
-    R_theor = abs(r) ** 2
-    T_theor = (n_sub / 1.0) * abs(t) ** 2   # свет выходит в подложку
     return R_theor, T_theor
 
 
 data = []
-
+#----------------Открытие и чтение данных---------------#
 try:
     with open('data.txt', 'r', encoding='utf-8') as f:
         # Читаем первую строку и извлекаем количество записей
@@ -107,8 +86,9 @@ print(f"\nУспешно прочитано {len(data)} записей.")
 for i, row in enumerate(data[:5]):
     print(f"{i+1}: {row}")
 
+#----------Конец блока считывания данных-------------#
 
-
+#---------Параметры для подбора----------------------#
 n_min, n_max = 1.0, 6.0
 k_min, k_max = 0.0001, 3.0
 n_steps = 100
@@ -154,7 +134,7 @@ print("\n" + "="*60)
 print("ОПОРНАЯ ТОЧКА С МИНИМАЛЬНОЙ НЕВЯЗКОЙ:")
 print(f"Длина волны λ = {best_global[0]:.2f} нм")
 print(f"Показатель преломления подложки n_sub = {best_global[1]:.4f}")
-print(f"Оптимальные параметры плёнки: n_film = {best_global[2]:.5f}, k_film = {best_global[3]:.6f}")
+print(f"Оптимальные параметры плёнки: n_film = {best_global[2]:.6f}, k_film = {best_global[3]:.6f}")
 print(f"Невязка F = {best_global[4]:.6f}")
 print(f"Экспериментальные: T_exp = {best_global[5]:.6f}, R_exp = {best_global[6]:.6f}")
 print(f"Теоретические:   T_theor = {best_global[7]:.6f}, R_theor = {best_global[8]:.6f}")

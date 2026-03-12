@@ -1,6 +1,6 @@
 import re
 import math
-import cmath
+import matplotlib.pyplot as plt
 
 def find_first_integer(line):
     """Возвращает первое целое число из строки или None."""
@@ -21,15 +21,41 @@ class SpectraRow:
     def __repr__(self):
         return f"λ={self.lam} -> n={self.n}, T={self.T}, R={self.R}"
     
-def compute_RT(n_film, k_film, lam, d_nm, n_sub):
-    """
-    Расчёт коэффициентов отражения R и пропускания T для тонкой плёнки
-    с комплексным показателем N = n_film + i*k_film, толщиной d_nm (нм),
-    на подложке с вещественным показателем n_sub. Нормальное падение из воздуха.
-    lam - длина волны в нм.
-    Возвращает (R_theor, T_theor).
-    """
+def compute_RT(n2, k2, lam, d_nm, n3):
+    """ Расчёт коэффициентов отражения R и пропускания T для тонкой плёнки,
+    толщиной d_nm (нм), lam - длина волны в нм.
+    Возвращает (R_theor, T_theor)."""
 
+    beta = 4.0 * math.pi * k * d_nm / lam
+    xi   = 4.0 * math.pi * n * d_nm / lam
+
+    n2_sq = n2 * n2
+    k2_sq = k2 * k2
+    n2k2_sum = n2_sq + k2_sq
+    n3_sq = n3 * n3
+
+    A1 = (n2k2_sum + 1) * (n2k2_sum + n3_sq) - 4 * n2_sq * n3
+    A2 = 2 * n2 * (n3 * (n2k2_sum + 1) - (n2k2_sum + n3_sq))
+    A3 = (n2k2_sum - 1) * (n2k2_sum - n3_sq) + 4 * k2_sq * n3
+    A4 = 2 * k2 * (n3 * (n2k2_sum - 1) - (n2k2_sum - n3_sq))
+    A5 = (n2k2_sum + 1) * (n2k2_sum + n3_sq) + 4 * n2_sq * n3
+    A6 = 2 * n2 * (n3 * (n2k2_sum + 1) + (n2k2_sum + n3_sq))
+    A7 = (n2k2_sum - 1) * (n2k2_sum - n3_sq) - 4 * k2_sq * n3
+    A8 = 2 * k2 * (n3 * (n2k2_sum - 1) + (n2k2_sum - n3_sq))
+
+    ch_beta = math.cosh(beta)
+    sh_beta = math.sinh(beta)
+    cos_xi  = math.cos(xi)
+    sin_xi  = math.sin(xi)
+
+    denominator = (A5 * ch_beta + A6 * sh_beta - A7 * cos_xi + A8 * sin_xi)
+    if abs(denominator) < 1e-12:
+        return float('inf'), float('inf')
+
+    numerator_R = A1 * ch_beta + A2 * sh_beta - A3 * cos_xi + A4 * sin_xi
+    R_theor = numerator_R / denominator
+    numerator_T = 8.0 * n3 * n2k2_sum
+    T_theor = numerator_T / denominator
     return R_theor, T_theor
 
 
@@ -89,14 +115,22 @@ for i, row in enumerate(data[:5]):
 #----------Конец блока считывания данных-------------#
 
 #---------Параметры для подбора----------------------#
-n_min, n_max = 1.0, 6.0
-k_min, k_max = 0.0001, 3.0
+n_min, n_max = 1.0, 14.0
+k_min, k_max = 0.0, 1.0
+d_nm = 100.0                     # толщина плёнки
+
+# Глобальный перебор для всех точек 
 n_steps = 100
-k_steps = 300
-d_nm = 100.0         
+k_steps = 100
+
+# Локальный перебор от опорной точки
+delta_n = 0.1
+delta_k = 0.1
+n_steps_local = 100
+k_steps_local = 100         
 
 # Список для хранения лучших результатов по каждой точке
-best_per_point = []   # каждый элемент: (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, T_theor, R_theor)
+best_glob_point = []   # каждый элемент: (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, T_theor, R_theor)
 
 print("\nВыполняется перебор для всех точек...")
 for idx, row in enumerate(data):
@@ -122,13 +156,13 @@ for idx, row in enumerate(data):
                 best_R = R_theor
                 best_T = T_theor
 
-    best_per_point.append((lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R))
+    best_glob_point.append((lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R))
 
     if (idx+1) % 10 == 0 or idx == 0 or idx == len(data)-1:
         print(f"Обработано {idx+1}/{len(data)} точек. Текущая λ = {lam}")
 
 # ---------- Поиск точки с глобальным минимумом невязки ----------
-best_global = min(best_per_point, key=lambda x: x[4])  # x[4] — это best_F
+best_global = min(best_glob_point, key=lambda x: x[4])  # x[4] — это best_F
 
 print("\n" + "="*60)
 print("ОПОРНАЯ ТОЧКА С МИНИМАЛЬНОЙ НЕВЯЗКОЙ:")

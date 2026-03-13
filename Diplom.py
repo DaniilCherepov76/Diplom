@@ -162,13 +162,93 @@ for idx, row in enumerate(data):
         print(f"Обработано {idx+1}/{len(data)} точек. Текущая λ = {lam}")
 
 # ---------- Поиск точки с глобальным минимумом невязки ----------
-best_global = min(best_glob_point, key=lambda x: x[4])  # x[4] — это best_F
-
+best_global = min(range(len(best_glob_point)), key=lambda x: best_glob_point[x][4])  # x[4] — это best_F
+ref_point = best_glob_point[best_global] 
 print("\n" + "="*60)
 print("ОПОРНАЯ ТОЧКА С МИНИМАЛЬНОЙ НЕВЯЗКОЙ:")
-print(f"Длина волны λ = {best_global[0]:.2f} нм")
-print(f"Показатель преломления подложки n_sub = {best_global[1]:.4f}")
-print(f"Оптимальные параметры плёнки: n_film = {best_global[2]:.6f}, k_film = {best_global[3]:.6f}")
-print(f"Невязка F = {best_global[4]:.6f}")
-print(f"Экспериментальные: T_exp = {best_global[5]:.6f}, R_exp = {best_global[6]:.6f}")
-print(f"Теоретические:   T_theor = {best_global[7]:.6f}, R_theor = {best_global[8]:.6f}")
+print(f"Длина волны λ = {ref_point[0]:.2f} нм")
+print(f"Показатель преломления подложки n_sub = {ref_point[1]:.4f}")
+print(f"Оптимальные параметры плёнки: n_film = {ref_point[2]:.6f}, k_film = {ref_point[3]:.6f}")
+print(f"Невязка F = {ref_point[4]:.6f}")
+print(f"Экспериментальные: T_exp = {ref_point[5]:.6f}, R_exp = {ref_point[6]:.6f}")
+print(f"Теоретические:   T_theor = {ref_point[7]:.6f}, R_theor = {ref_point[8]:.6f}")
+
+# Инициализируем массив финальных результатов (копируем глобальные)
+final_results = [None] * len(data)
+final_results[best_global] = ref_point
+
+# Движение влево
+print("\nУточнение влево от опорной точки...")
+for i in range(best_global - 1, -1, -1):
+    # Берём уже уточнённую правую соседнюю точку (i+1)
+    neighbour = final_results[i + 1]
+    row = data[i]
+    lam = row.lam
+    n_sub = row.n
+    T_exp = row.T
+    R_exp = row.R
+
+    # Окно поиска вокруг соседних значений
+    n_low = max(n_min, neighbour[2] - delta_n)
+    n_high = min(n_max, neighbour[2] + delta_n)
+    k_low = max(k_min, neighbour[3] - delta_k)
+    k_high = min(k_max, neighbour[3] + delta_k)
+
+    best_n = best_k = None
+    best_F = float('inf')
+    best_T = best_R = None
+
+    for ni in range(n_steps_local):
+        n = n_low + (n_high - n_low) * ni / (n_steps_local - 1)
+        for ki in range(k_steps_local):
+            k = k_low + (k_high - k_low) * ki / (k_steps_local - 1)
+            R_theor, T_theor = compute_RT(n, k, lam, d_nm, n_sub)
+            if math.isinf(R_theor) or math.isinf(T_theor):
+                continue
+            F = abs(R_theor - R_exp) + abs(T_theor - T_exp)
+            if F < best_F:
+                best_F = F
+                best_n = n
+                best_k = k
+                best_R = R_theor
+                best_T = T_theor
+
+    final_results[i] = (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R)
+    print(f"λ = {lam:.2f} -> n = {best_n:.5f}, k = {best_k:.6f}, F = {best_F:.6f}")
+
+# Движение вправо (увеличение длины волны)
+print("\nУточнение вправо от опорной точки...")
+for i in range(best_global + 1, len(data)):
+    neighbour = final_results[i - 1]
+    row = data[i]
+    lam = row.lam
+    n_sub = row.n
+    T_exp = row.T
+    R_exp = row.R
+
+    n_low = max(n_min, neighbour[2] - delta_n)
+    n_high = min(n_max, neighbour[2] + delta_n)
+    k_low = max(k_min, neighbour[3] - delta_k)
+    k_high = min(k_max, neighbour[3] + delta_k)
+
+    best_n = best_k = None
+    best_F = float('inf')
+    best_T = best_R = None
+
+    for ni in range(n_steps_local):
+        n = n_low + (n_high - n_low) * ni / (n_steps_local - 1)
+        for ki in range(k_steps_local):
+            k = k_low + (k_high - k_low) * ki / (k_steps_local - 1)
+            R_theor, T_theor = compute_RT(n, k, lam, d_nm, n_sub)
+            if math.isinf(R_theor) or math.isinf(T_theor):
+                continue
+            F = abs(R_theor - R_exp) + abs(T_theor - T_exp)
+            if F < best_F:
+                best_F = F
+                best_n = n
+                best_k = k
+                best_R = R_theor
+                best_T = T_theor
+
+    final_results[i] = (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R)
+    print(f"λ = {lam:.2f} -> n = {best_n:.5f}, k = {best_k:.6f}, F = {best_F:.6f}")

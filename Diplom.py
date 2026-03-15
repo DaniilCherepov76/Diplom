@@ -252,3 +252,49 @@ for i in range(best_global + 1, len(data)):
 
     final_results[i] = (lam, n_sub, best_n, best_k, best_F, T_exp, R_exp, best_T, best_R)
     print(f"λ = {lam:.2f} -> n = {best_n:.5f}, k = {best_k:.6f}, F = {best_F:.6f}")
+
+#         Визуализация результатов
+lams = [p[0] for p in final_results]
+n_films = [p[2] for p in final_results]
+k_films = [p[3] for p in final_results]
+T_exp_list = [p[5] for p in final_results]
+R_exp_list = [p[6] for p in final_results]
+T_theor_list = [p[7] for p in final_results]
+R_theor_list = [p[8] for p in final_results]
+
+plt.figure(figsize=(12, 10))
+
+plt.subplot(2, 2, 1)
+plt.plot(lams, T_exp_list, 'o-', label='T_exp', markersize=4)
+plt.plot(lams, T_theor_list, 's-', label='T_theor', markersize=2)
+plt.xlabel('Длина волны, нм')
+plt.ylabel('T')
+plt.title('Сравнение пропускания')
+plt.legend()
+plt.grid(True)
+
+plt.subplot(2, 2, 2)
+plt.plot(lams, R_exp_list, 'o-', label='R_exp', markersize=4)
+plt.plot(lams, R_theor_list, 's-', label='R_theor', markersize=2)
+plt.xlabel('Длина волны, нм')
+plt.ylabel('R')
+plt.title('Сравнение отражения')
+plt.legend()
+plt.grid(True)
+
+plt.subplot(2, 2, 3)
+plt.plot(lams, n_films, 'o-', color='green', markersize=4)
+plt.xlabel('Длина волны, нм')
+plt.ylabel('n_film')
+plt.title('Показатель преломления плёнки')
+plt.grid(True)
+
+plt.subplot(2, 2, 4)
+plt.plot(lams, k_films, 'o-', color='red', markersize=4)
+plt.xlabel('Длина волны, нм')
+plt.ylabel('k_film')
+plt.title('Коэффициент экстинкции плёнки')
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
